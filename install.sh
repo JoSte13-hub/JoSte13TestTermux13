@@ -1,12 +1,31 @@
 #!/bin/bash
 
-GREEN="\e[32m"
+GREEN="\e[92m"   # hellgrün
 RESET="\e[0m"
 
-echo -e "${GREEN}[*] Starte Installation...${RESET}"
+clear_title() {
+  clear
+  # Get terminal width for center alignment, fallback to 80
+  width=$(tput cols 2>/dev/null || echo 80)
+  title="     _      ____  _       _ _____
+    | | ___/ ___|| |_ ___/ |___ /
+ _  | |/ _ \___ \| __/ _ \ | |_ \\
+| |_| | (_) |__) | ||  __/ |___) |
+ \___/ \___/____/ \__\___|_|____/"
+  # Print each line centered
+  while IFS= read -r line; do
+    printf "%*s%s\n" $(((width + ${#line}) / 2)) "" "$line"
+  done <<< "$title"
+  echo
+}
+
+echo -e "${GREEN}[*] Starting installation...${RESET}"
 
 pkg update -y && pkg upgrade -y
-pkg install -y python python2 python3 apache2 wget curl zip unzip
+pkg install -y python python2 python3 apache2 wget curl zip unzip python-pip
+
+# Install readline support for input history & arrows in python input
+pip install prompt_toolkit
 
 mkdir -p ~/commands
 mkdir -p ~/downloads
@@ -16,11 +35,11 @@ USER_FILE=~/user/user.py
 COMMANDS_LIST=~/commands/commands_list.txt
 
 cat > "$COMMANDS_LIST" << EOF
-help - zeigt diese Hilfe - help.py
+help - show this help - help.py
 cnc - create new command - cnc.py
 cun - change user name - cun.py
 cup - change password - cup.py
-ssal - save system as link - ssal.py
+ssal - save system as backup zip - ssal.py
 EOF
 
 cat > ~/start.py << 'EOF'
@@ -31,11 +50,13 @@ import subprocess
 import getpass
 import shutil
 import zipfile
+from prompt_toolkit import prompt
 
 USER_FILE = os.path.expanduser("~/user/user.py")
 COMMANDS_DIR = os.path.expanduser("~/commands")
 COMMANDS_LIST_FILE = os.path.expanduser("~/commands/commands_list.txt")
 DOWNLOADS_DIR = os.path.expanduser("~/downloads")
+HOME_DIR = os.path.expanduser("~")
 
 def clear():
     os.system("clear")
@@ -70,53 +91,54 @@ def load_commands():
 
 def run_command(cmd_name, commands):
     if cmd_name not in commands:
-        print(f"Unbekannter Befehl: {cmd_name}")
+        print(f"Unknown command: {cmd_name}")
         return
     path = commands[cmd_name]["file"]
     if not os.path.exists(path):
-        print(f"Datei für Befehl nicht gefunden: {path}")
+        print(f"Command file not found: {path}")
         return
     try:
         with open(path, "r") as f:
             code = f.read()
         exec(code, globals())
     except Exception as e:
-        print(f"Fehler beim Ausführen von {cmd_name}: {e}")
+        print(f"Error executing {cmd_name}: {e}")
 
 def create_account():
     clear()
-    username = input("Name: ")
-    password = input("Password: ")
+    print_title()
+    username = prompt("Enter username: ")
+    password = prompt("Enter password: ", is_password=True)
     save_user(username, password)
     clear()
-    print("[*] Account erstellt!")
+    print("[*] Account created!")
     time.sleep(1)
     clear()
     return username
 
 def load_from_zip():
     clear()
-    downloads_dir = os.path.expanduser("~/downloads")
-    print("Verfügbare ZIP-Dateien im downloads Ordner:")
-    files = [f for f in os.listdir(downloads_dir) if f.endswith(".zip")]
+    print_title()
+    print("Available ZIP files in your home directory:")
+    files = [f for f in os.listdir(HOME_DIR) if f.endswith(".zip")]
     if not files:
-        print("Keine ZIP-Dateien gefunden.")
+        print("No ZIP files found.")
         time.sleep(2)
         return None
     for i, file in enumerate(files, 1):
         print(f"{i}. {file}")
-    choice = input("Gib Nummer der ZIP zum laden ein: ")
+    choice = prompt("Enter the number of the ZIP to load: ")
     try:
         index = int(choice) - 1
         if index < 0 or index >= len(files):
-            print("Ungültige Auswahl.")
+            print("Invalid selection.")
             time.sleep(2)
             return None
     except:
-        print("Ungültige Eingabe.")
+        print("Invalid input.")
         time.sleep(2)
         return None
-    zip_path = os.path.join(downloads_dir, files[index])
+    zip_path = os.path.join(HOME_DIR, files[index])
 
     temp_dir = os.path.expanduser("~/temp_restore")
     if os.path.exists(temp_dir):
@@ -127,13 +149,13 @@ def load_from_zip():
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(temp_dir)
     except Exception as e:
-        print(f"Fehler beim Entpacken: {e}")
+        print(f"Error extracting ZIP: {e}")
         time.sleep(2)
         return None
 
     user_py_path = os.path.join(temp_dir, "user/user.py")
     if not os.path.exists(user_py_path):
-        print("Kein user.py in ZIP gefunden!")
+        print("No user.py found inside ZIP!")
         shutil.rmtree(temp_dir)
         time.sleep(2)
         return None
@@ -144,14 +166,12 @@ def load_from_zip():
     original_password = user_data.get("PASSWORD", "")
     original_username = user_data.get("USERNAME", "")
 
-    pw_attempt = getpass.getpass("Passwort eingeben zum Entpacken: ")
+    pw_attempt = prompt("Enter password to decrypt: ", is_password=True)
     if pw_attempt != original_password:
-        print("Falsches Passwort! Lösche temporäre Dateien...")
+        print("Wrong password! Cleaning temp files...")
         shutil.rmtree(temp_dir)
         time.sleep(2)
         return None
-
-    home = os.path.expanduser("~")
 
     def copytree(src, dst):
         for item in os.listdir(src):
@@ -164,19 +184,19 @@ def load_from_zip():
             else:
                 shutil.copy2(s, d)
 
-    copytree(temp_dir, home)
+    copytree(temp_dir, HOME_DIR)
     shutil.rmtree(temp_dir)
-    print(f"System von ZIP '{files[index]}' geladen. Willkommen {original_username}!")
+    print(f"System loaded from ZIP '{files[index]}'. Welcome {original_username}!")
     time.sleep(2)
-
     return original_username
 
 def main_menu():
     while True:
         clear()
-        print("1. new account")
-        print("2. from zip backup")
-        choice = input("\nchoose from: ")
+        print_title()
+        print("1. Create new account")
+        print("2. Load from ZIP backup")
+        choice = prompt("\nChoose (1 or 2): ")
         if choice == "1":
             user = create_account()
             return user
@@ -185,38 +205,51 @@ def main_menu():
             if user:
                 return user
             else:
-                print("Laden fehlgeschlagen. Versuche es erneut.")
+                print("Loading failed. Try again.")
                 time.sleep(2)
         else:
-            print("Ungültige Eingabe!")
+            print("Invalid input!")
             time.sleep(1)
 
 def print_help(commands):
-    print("Verfügbare Befehle:")
+    print("Available commands:")
     for name, data in commands.items():
         print(f"{name} - {data['desc']}")
 
 def format_path(path):
-    home = os.path.expanduser("~")
+    home = HOME_DIR
     if path == home:
         return "~"
     if path.startswith(home + "/"):
         rel = path[len(home) + 1:]
         parts = rel.split("/")
-        if len(parts) > 3:
-            parts = parts[-3:]
-        return "/".join(parts)
+        # Only show shortened path if 3 or more parts, else show with ~ prefix
+        if len(parts) < 3:
+            return "~/" + "/".join(parts)
+        else:
+            return "/".join(parts[-3:])
     else:
         parts = path.strip("/").split("/")
         if len(parts) > 3:
             parts = parts[-3:]
         return "/".join(parts)
 
+def print_title():
+    title = """
+     _      ____  _       _ _____
+    | | ___/ ___|| |_ ___/ |___ /
+ _  | |/ _ \___ \| __/ _ \ | |_ \\
+| |_| | (_) |__) | ||  __/ |___) |
+ \___/ \___/____/ \__\___|_|____/
+"""
+    print("\033[92m" + title + "\033[0m")  # bright green
+
 def interactive_shell(username, commands):
     while True:
         try:
             cwd_display = format_path(os.getcwd())
-            inp = input(f"\033[32m┌──(\033[34m{username}@JoSte13\033[32m)─[\033[37m{cwd_display}\033[32m]\n└─\033[34m$ \033[0m").strip()
+            inp = prompt(f"\033[32m┌──(\033[34m{username}@JoSte13\033[32m)─[\033[37m{cwd_display}\033[32m]\n└─\033[34m$ \033[0m")
+            inp = inp.strip()
             if inp == "":
                 continue
             if inp == "exit":
@@ -228,12 +261,12 @@ def interactive_shell(username, commands):
                 try:
                     path = inp[3:].strip()
                     if path == "":
-                        path = os.path.expanduser("~")
+                        path = HOME_DIR
                     os.chdir(os.path.expanduser(path))
                 except FileNotFoundError:
-                    print(f"Ordner nicht gefunden: {path}")
+                    print(f"Directory not found: {path}")
                 except Exception as e:
-                    print(f"Fehler bei cd: {e}")
+                    print(f"Error on cd: {e}")
             elif inp in commands:
                 run_command(inp, commands)
                 new_username, _ = load_user()
@@ -243,11 +276,11 @@ def interactive_shell(username, commands):
                 try:
                     subprocess.run(inp, shell=True)
                 except Exception as e:
-                    print(f"Fehler beim Ausführen des Shell-Befehls: {e}")
+                    print(f"Error executing shell command: {e}")
         except KeyboardInterrupt:
-            print("\nNutze 'exit' zum Beenden.")
+            print("\nUse 'exit' to quit.")
         except Exception as e:
-            print(f"Fehler: {e}")
+            print(f"Error: {e}")
 
 def main():
     username, password = load_user()
@@ -255,7 +288,7 @@ def main():
         username = main_menu()
     commands = load_commands()
     clear()
-    print(f"Willkommen, {username}!")
+    print(f"Welcome, {username}!")
     interactive_shell(username, commands)
 
 if __name__ == "__main__":
@@ -281,11 +314,11 @@ commands_list_file = os.path.expanduser("~/commands/commands_list.txt")
 
 name = input("Name: ")
 desc = input("Description: ")
-file_name = input("File Name (existierende Datei in commands/, z.B. befehl.py): ")
+file_name = input("File Name (existing file in commands/, e.g. command.py): ")
 
 cmd_path = os.path.expanduser(f"~/commands/{file_name}")
 if not os.path.exists(cmd_path):
-    print("[!] Datei existiert nicht! Bitte erstelle sie im commands-Ordner.")
+    print("[!] File does not exist! Please create it in the commands folder first.")
     exit()
 
 exists = False
@@ -296,13 +329,13 @@ with open(commands_list_file, "r") as f:
             break
 
 if exists:
-    print("[!] Befehl existiert bereits!")
+    print("[!] Command already exists!")
     exit()
 
 with open(commands_list_file, "a") as f:
     f.write(f"{name} - {desc} - {file_name}\n")
 
-print(f"[+] Command '{name}' hinzugefügt!")
+print(f"[+] Command '{name}' added!")
 EOF
 
 # cun.py
@@ -310,7 +343,7 @@ cat > ~/commands/cun.py << 'EOF'
 import os
 USER_FILE = os.path.expanduser("~/user/user.py")
 
-new_name = input("new user name: ")
+new_name = input("New user name: ")
 
 lines = []
 with open(USER_FILE, "r") as f:
@@ -322,7 +355,7 @@ with open(USER_FILE, "r") as f:
 with open(USER_FILE, "w") as f:
     f.writelines(lines)
 
-print("[*] Benutzername geändert!")
+print("[*] Username changed!")
 EOF
 
 # cup.py
@@ -330,7 +363,7 @@ cat > ~/commands/cup.py << 'EOF'
 import os
 USER_FILE = os.path.expanduser("~/user/user.py")
 
-new_pw = input("new password: ")
+new_pw = input("New password: ")
 lines = []
 with open(USER_FILE, "r") as f:
     for line in f:
@@ -340,7 +373,7 @@ with open(USER_FILE, "r") as f:
             lines.append(line)
 with open(USER_FILE, "w") as f:
     f.writelines(lines)
-print("[*] Passwort geändert!")
+print("[*] Password changed!")
 EOF
 
 # ssal.py
@@ -361,14 +394,15 @@ downloads_dir = os.path.expanduser("~/downloads")
 with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
     for foldername, subfolders, filenames in os.walk(home):
         for filename in filenames:
+            # Skip adding the backup zip itself to avoid recursion
             if foldername.startswith(downloads_dir) and filename == zip_name:
                 continue
             zipf.write(os.path.join(foldername, filename), os.path.relpath(os.path.join(foldername, filename), home))
 
-print(f"Backup gespeichert: {zip_path}")
+print(f"Backup saved: {zip_path}")
 EOF
 
-echo -e "${GREEN}[*] Installation abgeschlossen.${RESET}"
+echo -e "${GREEN}[*] Installation completed.${RESET}"
 
 rm -- "$0"
 
