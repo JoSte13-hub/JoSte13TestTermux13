@@ -279,6 +279,11 @@ def interactive_shell(username, commands):
                 # Nach cnc Befehl Befehle neu laden, damit neuer Befehl erkannt wird
                 if inp == "cnc":
                     commands = load_commands()
+                # Nach cun Befehl den Benutzernamen neu laden
+                elif inp == "cun":
+                    new_username, _ = load_user()
+                    if new_username:
+                        username = new_username
             else:
                 try:
                     subprocess.run(inp, shell=True)
