@@ -1,18 +1,16 @@
 #!/bin/bash
 
-GREEN="\e[92m"   # hellgrün
+GREEN="\e[32m"
 RESET="\e[0m"
 
 clear_title() {
   clear
-  # Get terminal width for center alignment, fallback to 80
   width=$(tput cols 2>/dev/null || echo 80)
   title="     _      ____  _       _ _____
     | | ___/ ___|| |_ ___/ |___ /
  _  | |/ _ \___ \| __/ _ \ | |_ \\
 | |_| | (_) |__) | ||  __/ |___) |
  \___/ \___/____/ \__\___|_|____/"
-  # Print each line centered
   while IFS= read -r line; do
     printf "%*s%s\n" $(((width + ${#line}) / 2)) "" "$line"
   done <<< "$title"
@@ -22,10 +20,7 @@ clear_title() {
 echo -e "${GREEN}[*] Starting installation...${RESET}"
 
 pkg update -y && pkg upgrade -y
-pkg install -y python python2 python3 apache2 wget curl zip unzip python-pip
-
-# Install readline support for input history & arrows in python input
-pip install prompt_toolkit
+pkg install -y python python2 python3 apache2 wget curl zip unzip
 
 mkdir -p ~/commands
 mkdir -p ~/downloads
@@ -50,7 +45,6 @@ import subprocess
 import getpass
 import shutil
 import zipfile
-from prompt_toolkit import prompt
 
 USER_FILE = os.path.expanduser("~/user/user.py")
 COMMANDS_DIR = os.path.expanduser("~/commands")
@@ -107,8 +101,8 @@ def run_command(cmd_name, commands):
 def create_account():
     clear()
     print_title()
-    username = prompt("Enter username: ")
-    password = prompt("Enter password: ", is_password=True)
+    username = input("Enter username: ")
+    password = getpass.getpass("Enter password: ")
     save_user(username, password)
     clear()
     print("[*] Account created!")
@@ -127,7 +121,7 @@ def load_from_zip():
         return None
     for i, file in enumerate(files, 1):
         print(f"{i}. {file}")
-    choice = prompt("Enter the number of the ZIP to load: ")
+    choice = input("Enter the number of the ZIP to load: ")
     try:
         index = int(choice) - 1
         if index < 0 or index >= len(files):
@@ -166,7 +160,7 @@ def load_from_zip():
     original_password = user_data.get("PASSWORD", "")
     original_username = user_data.get("USERNAME", "")
 
-    pw_attempt = prompt("Enter password to decrypt: ", is_password=True)
+    pw_attempt = getpass.getpass("Enter password to decrypt: ")
     if pw_attempt != original_password:
         print("Wrong password! Cleaning temp files...")
         shutil.rmtree(temp_dir)
@@ -196,7 +190,7 @@ def main_menu():
         print_title()
         print("1. Create new account")
         print("2. Load from ZIP backup")
-        choice = prompt("\nChoose (1 or 2): ")
+        choice = input("\nChoose (1 or 2): ")
         if choice == "1":
             user = create_account()
             return user
@@ -223,7 +217,6 @@ def format_path(path):
     if path.startswith(home + "/"):
         rel = path[len(home) + 1:]
         parts = rel.split("/")
-        # Only show shortened path if 3 or more parts, else show with ~ prefix
         if len(parts) < 3:
             return "~/" + "/".join(parts)
         else:
@@ -242,14 +235,13 @@ def print_title():
 | |_| | (_) |__) | ||  __/ |___) |
  \___/ \___/____/ \__\___|_|____/
 """
-    print("\033[92m" + title + "\033[0m")  # bright green
+    print("\033[92m" + title + "\033[0m")
 
 def interactive_shell(username, commands):
     while True:
         try:
             cwd_display = format_path(os.getcwd())
-            inp = prompt(f"\033[32m┌──(\033[34m{username}@JoSte13\033[32m)─[\033[37m{cwd_display}\033[32m]\n└─\033[34m$ \033[0m")
-            inp = inp.strip()
+            inp = input(f"\033[32m┌──(\033[34m{username}@JoSte13\033[32m)─[\033[37m{cwd_display}\033[32m]\n└─\033[34m$ \033[0m").strip()
             if inp == "":
                 continue
             if inp == "exit":
@@ -394,7 +386,6 @@ downloads_dir = os.path.expanduser("~/downloads")
 with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
     for foldername, subfolders, filenames in os.walk(home):
         for filename in filenames:
-            # Skip adding the backup zip itself to avoid recursion
             if foldername.startswith(downloads_dir) and filename == zip_name:
                 continue
             zipf.write(os.path.join(foldername, filename), os.path.relpath(os.path.join(foldername, filename), home))
