@@ -256,7 +256,7 @@ def interactive_shell(username, commands):
     while True:
         try:
             cwd_display = format_path(os.getcwd())
-            inp = input(f"\033[32m┌──(\033[34m{username}@JoSte13\033[32m)─[\033[37m{cwd_display}\033[32m]\n└─\033[34m$ \033[0m").strip()
+            inp = input(f"\033[32m┌──(\033[34m{username}@JoSte13\033[32m)─[\033[37m{cwd_display}\033[32m]\n\033[32m└─\033[34m$ \033[0m").strip()
             if inp == "":
                 continue
             if inp == "exit":
