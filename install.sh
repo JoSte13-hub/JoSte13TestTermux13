@@ -46,6 +46,21 @@ import getpass
 import shutil
 import zipfile
 
+try:
+    import readline
+except ImportError:
+    pass
+
+import atexit
+
+histfile = os.path.expanduser("~/.jo_ste13_history")
+try:
+    readline.read_history_file(histfile)
+except FileNotFoundError:
+    pass
+
+atexit.register(readline.write_history_file, histfile)
+
 USER_FILE = os.path.expanduser("~/user/user.py")
 COMMANDS_DIR = os.path.expanduser("~/commands")
 COMMANDS_LIST_FILE = os.path.expanduser("~/commands/commands_list.txt")
