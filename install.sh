@@ -5,7 +5,7 @@ RESET="\e[0m"
 
 echo -e "${GREEN}[*] Starte Installation...${RESET}"
 
-# Update und Installation der Pakete
+# Update und Pakete installieren
 pkg update -y && pkg upgrade -y
 pkg install -y python python2 python3 apache2 wget curl zip unzip
 
@@ -17,7 +17,7 @@ mkdir -p ~/user
 USER_FILE=~/user/user.py
 COMMANDS_LIST=~/commands/commands_list.txt
 
-# commands_list.txt mit Standardbefehlen
+# commands_list.txt mit Standardbefehlen erstellen
 cat > "$COMMANDS_LIST" << EOF
 help - zeigt diese Hilfe - help.py
 cnc - create new command - cnc.py
@@ -26,10 +26,11 @@ cup - change password - cup.py
 ssal - save system as link - ssal.py
 EOF
 
-# start.py (interaktive Python-Shell)
+# start.py mit interaktiver Python-Shell und klarer Ausgabe vor Eingabe
 cat > ~/start.py << 'EOF'
 import os
 import sys
+import time
 
 USER_FILE = os.path.expanduser("~/user/user.py")
 COMMANDS_DIR = os.path.expanduser("~/commands")
@@ -87,13 +88,15 @@ def create_account():
     username = input("Name: ")
     password = input("Password: ")
     save_user(username, password)
+    clear()
     print("[*] Account erstellt!")
+    time.sleep(1)
+    clear()
     return username
 
 def load_from_link():
     import urllib.request
     import zipfile
-    import time
     clear()
     link = input("Link: ")
     zip_path = os.path.join(DOWNLOADS_DIR, "system.zip")
@@ -122,7 +125,7 @@ def main_menu():
             return user
         else:
             print("Ungültige Eingabe!")
-            input("Enter zum Weitermachen...")
+            time.sleep(1)
 
 def print_help(commands):
     print("Verfügbare Befehle:")
@@ -152,6 +155,7 @@ def main():
     if username is None:
         username = main_menu()
     commands = load_commands()
+    clear()
     print(f"Willkommen, {username}!")
     interactive_shell(username, commands)
 
@@ -159,7 +163,7 @@ if __name__ == "__main__":
     main()
 EOF
 
-# help.py
+# help.py (zeigt alle Befehle)
 cat > ~/commands/help.py << 'EOF'
 commands_list_file = os.path.expanduser("~/commands/commands_list.txt")
 with open(commands_list_file, "r") as f:
@@ -171,7 +175,7 @@ with open(commands_list_file, "r") as f:
         print(f"{name} - {desc}")
 EOF
 
-# cnc.py
+# cnc.py (neuen Befehl hinzufügen)
 cat > ~/commands/cnc.py << 'EOF'
 import os
 commands_list_file = os.path.expanduser("~/commands/commands_list.txt")
@@ -202,7 +206,7 @@ with open(commands_list_file, "a") as f:
 print(f"[+] Command '{name}' hinzugefügt!")
 EOF
 
-# cun.py
+# cun.py (Benutzername ändern)
 cat > ~/commands/cun.py << 'EOF'
 import os
 USER_FILE = os.path.expanduser("~/user/user.py")
@@ -222,7 +226,7 @@ with open(USER_FILE, "w") as f:
 print("[*] Benutzername geändert. Bitte neu starten!")
 EOF
 
-# cup.py
+# cup.py (Passwort ändern)
 cat > ~/commands/cup.py << 'EOF'
 import os
 USER_FILE = os.path.expanduser("~/user/user.py")
@@ -240,7 +244,7 @@ with open(USER_FILE, "w") as f:
 print("[*] Passwort geändert!")
 EOF
 
-# ssal.py
+# ssal.py (System als ZIP speichern)
 cat > ~/commands/ssal.py << 'EOF'
 import os
 import zipfile
@@ -266,6 +270,8 @@ EOF
 
 echo -e "${GREEN}[*] Installation abgeschlossen.${RESET}"
 
+# Lösche die install.sh selbst
 rm -- "$0"
 
+# Starte automatisch das System
 python3 ~/start.py
