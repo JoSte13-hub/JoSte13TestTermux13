@@ -199,7 +199,7 @@ def print_help(commands):
 def interactive_shell(username, commands):
     while True:
         try:
-            inp = input(f"\033[32m┌──(\033[34m{username}@JoSte13\033[32m)─[\033[37m~\033[32m]\n└─\033[34m$ \033[0m").strip()
+            inp = input(f"\033[32m┌──(\033[34m{username}@JoSte13\033[32m)─[\033[37m{os.getcwd()}\033[32m]\n└─\033[34m$ \033[0m").strip()
             if inp == "":
                 continue
             if inp == "exit":
@@ -207,8 +207,21 @@ def interactive_shell(username, commands):
                 break
             elif inp == "help":
                 print_help(commands)
+            elif inp.startswith("cd "):
+                try:
+                    path = inp[3:].strip()
+                    if path == "":
+                        path = os.path.expanduser("~")
+                    os.chdir(os.path.expanduser(path))
+                except FileNotFoundError:
+                    print(f"Ordner nicht gefunden: {path}")
+                except Exception as e:
+                    print(f"Fehler bei cd: {e}")
             elif inp in commands:
                 run_command(inp, commands)
+                new_username, _ = load_user()
+                if new_username != username:
+                    username = new_username
             else:
                 try:
                     subprocess.run(inp, shell=True)
@@ -292,7 +305,7 @@ with open(USER_FILE, "r") as f:
 with open(USER_FILE, "w") as f:
     f.writelines(lines)
 
-print("[*] Benutzername geändert. Bitte neu starten!")
+print("[*] Benutzername geändert!")
 EOF
 
 # cup.py
@@ -313,7 +326,7 @@ with open(USER_FILE, "w") as f:
 print("[*] Passwort geändert!")
 EOF
 
-# ssal.py ohne Passwortabfrage
+# ssal.py
 cat > ~/commands/ssal.py << 'EOF'
 import os
 import zipfile
@@ -326,15 +339,14 @@ zip_name = f"user-{USERNAME}-joste13.zip"
 zip_path = os.path.expanduser(f"~/downloads/{zip_name}")
 
 home = os.path.expanduser("~")
+downloads_dir = os.path.expanduser("~/downloads")
 
 with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
     for foldername, subfolders, filenames in os.walk(home):
-        # Überspringe die ZIP selbst im downloads Ordner
-        if foldername.startswith(os.path.expanduser("~/downloads")):
-            continue
         for filename in filenames:
-            file_path = os.path.join(foldername, filename)
-            zipf.write(file_path, os.path.relpath(file_path, home))
+            if foldername.startswith(downloads_dir) and filename == zip_name:
+                continue
+            zipf.write(os.path.join(foldername, filename), os.path.relpath(os.path.join(foldername, filename), home))
 
 print(f"Backup gespeichert: {zip_path}")
 EOF
