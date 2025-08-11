@@ -196,10 +196,27 @@ def print_help(commands):
     for name, data in commands.items():
         print(f"{name} - {data['desc']}")
 
+def format_path(path):
+    home = os.path.expanduser("~")
+    if path == home:
+        return "~"
+    if path.startswith(home + "/"):
+        rel = path[len(home) + 1:]
+        parts = rel.split("/")
+        if len(parts) > 3:
+            parts = parts[-3:]
+        return "/".join(parts)
+    else:
+        parts = path.strip("/").split("/")
+        if len(parts) > 3:
+            parts = parts[-3:]
+        return "/".join(parts)
+
 def interactive_shell(username, commands):
     while True:
         try:
-            inp = input(f"\033[32m┌──(\033[34m{username}@JoSte13\033[32m)─[\033[37m{os.getcwd()}\033[32m]\n└─\033[34m$ \033[0m").strip()
+            cwd_display = format_path(os.getcwd())
+            inp = input(f"\033[32m┌──(\033[34m{username}@JoSte13\033[32m)─[\033[37m{cwd_display}\033[32m]\n└─\033[34m$ \033[0m").strip()
             if inp == "":
                 continue
             if inp == "exit":
