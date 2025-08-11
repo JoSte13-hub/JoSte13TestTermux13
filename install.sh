@@ -276,9 +276,9 @@ def interactive_shell(username, commands):
                     print(f"Error on cd: {e}")
             elif inp in commands:
                 run_command(inp, commands)
-                new_username, _ = load_user()
-                if new_username != username:
-                    username = new_username
+                # Nach cnc Befehl Befehle neu laden, damit neuer Befehl erkannt wird
+                if inp == "cnc":
+                    commands = load_commands()
             else:
                 try:
                     subprocess.run(inp, shell=True)
