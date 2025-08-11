@@ -5,7 +5,7 @@ RESET="\e[0m"
 
 echo -e "${GREEN}[*] Starte Installation...${RESET}"
 
-# Update und Pakete installieren
+# Pakete installieren
 pkg update -y && pkg upgrade -y
 pkg install -y python python2 python3 apache2 wget curl zip unzip
 
@@ -17,7 +17,7 @@ mkdir -p ~/user
 USER_FILE=~/user/user.py
 COMMANDS_LIST=~/commands/commands_list.txt
 
-# commands_list.txt mit Standardbefehlen erstellen
+# Befehlsliste anlegen
 cat > "$COMMANDS_LIST" << EOF
 help - zeigt diese Hilfe - help.py
 cnc - create new command - cnc.py
@@ -26,11 +26,12 @@ cup - change password - cup.py
 ssal - save system as link - ssal.py
 EOF
 
-# start.py mit interaktiver Python-Shell und klarer Ausgabe vor Eingabe
+# start.py mit Shell-Befehls-Ausführung + Python-Befehle
 cat > ~/start.py << 'EOF'
 import os
 import sys
 import time
+import subprocess
 
 USER_FILE = os.path.expanduser("~/user/user.py")
 COMMANDS_DIR = os.path.expanduser("~/commands")
@@ -143,8 +144,14 @@ def interactive_shell(username, commands):
                 break
             elif inp == "help":
                 print_help(commands)
-            else:
+            elif inp in commands:
                 run_command(inp, commands)
+            else:
+                # Normale Shell-Befehle ausführen
+                try:
+                    subprocess.run(inp, shell=True)
+                except Exception as e:
+                    print(f"Fehler beim Ausführen des Shell-Befehls: {e}")
         except KeyboardInterrupt:
             print("\nNutze 'exit' zum Beenden.")
         except Exception as e:
@@ -270,8 +277,6 @@ EOF
 
 echo -e "${GREEN}[*] Installation abgeschlossen.${RESET}"
 
-# Lösche die install.sh selbst
 rm -- "$0"
 
-# Starte automatisch das System
 python3 ~/start.py
