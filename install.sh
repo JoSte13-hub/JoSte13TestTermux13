@@ -5,11 +5,9 @@ RESET="\e[0m"
 
 echo -e "${GREEN}[*] Starte Installation...${RESET}"
 
-# Pakete installieren
 pkg update -y && pkg upgrade -y
 pkg install -y python python2 python3 apache2 wget curl zip unzip
 
-# Ordnerstruktur anlegen
 mkdir -p ~/commands
 mkdir -p ~/downloads
 mkdir -p ~/user
@@ -17,7 +15,6 @@ mkdir -p ~/user
 USER_FILE=~/user/user.py
 COMMANDS_LIST=~/commands/commands_list.txt
 
-# Befehlsliste anlegen
 cat > "$COMMANDS_LIST" << EOF
 help - zeigt diese Hilfe - help.py
 cnc - create new command - cnc.py
@@ -26,12 +23,14 @@ cup - change password - cup.py
 ssal - save system as link - ssal.py
 EOF
 
-# start.py mit Shell-Befehls-Ausführung + Python-Befehle
 cat > ~/start.py << 'EOF'
 import os
 import sys
 import time
 import subprocess
+import getpass
+import shutil
+import zipfile
 
 USER_FILE = os.path.expanduser("~/user/user.py")
 COMMANDS_DIR = os.path.expanduser("~/commands")
@@ -95,35 +94,99 @@ def create_account():
     clear()
     return username
 
-def load_from_link():
-    import urllib.request
-    import zipfile
+def load_from_zip():
     clear()
-    link = input("Link: ")
-    zip_path = os.path.join(DOWNLOADS_DIR, "system.zip")
+    downloads_dir = os.path.expanduser("~/downloads")
+    print("Verfügbare ZIP-Dateien im downloads Ordner:")
+    files = [f for f in os.listdir(downloads_dir) if f.endswith(".zip")]
+    if not files:
+        print("Keine ZIP-Dateien gefunden.")
+        time.sleep(2)
+        return None
+    for i, file in enumerate(files, 1):
+        print(f"{i}. {file}")
+    choice = input("Gib Nummer der ZIP zum laden ein: ")
     try:
-        urllib.request.urlretrieve(link, zip_path)
+        index = int(choice) - 1
+        if index < 0 or index >= len(files):
+            print("Ungültige Auswahl.")
+            time.sleep(2)
+            return None
+    except:
+        print("Ungültige Eingabe.")
+        time.sleep(2)
+        return None
+    zip_path = os.path.join(downloads_dir, files[index])
+
+    temp_dir = os.path.expanduser("~/temp_restore")
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
+    os.makedirs(temp_dir)
+
+    try:
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(os.path.expanduser("~"))
-        print("[*] System geladen!")
+            zip_ref.extractall(temp_dir)
     except Exception as e:
-        print(f"Fehler beim Laden: {e}")
-    time.sleep(1)
-    clear()
+        print(f"Fehler beim Entpacken: {e}")
+        time.sleep(2)
+        return None
+
+    user_py_path = os.path.join(temp_dir, "user/user.py")
+    if not os.path.exists(user_py_path):
+        print("Kein user.py in ZIP gefunden!")
+        shutil.rmtree(temp_dir)
+        time.sleep(2)
+        return None
+
+    user_data = {}
+    with open(user_py_path, "r") as f:
+        exec(f.read(), user_data)
+    original_password = user_data.get("PASSWORD", "")
+    original_username = user_data.get("USERNAME", "")
+
+    pw_attempt = getpass.getpass("Passwort eingeben zum Entpacken: ")
+    if pw_attempt != original_password:
+        print("Falsches Passwort! Lösche temporäre Dateien...")
+        shutil.rmtree(temp_dir)
+        time.sleep(2)
+        return None
+
+    home = os.path.expanduser("~")
+
+    def copytree(src, dst):
+        for item in os.listdir(src):
+            s = os.path.join(src, item)
+            d = os.path.join(dst, item)
+            if os.path.isdir(s):
+                if not os.path.exists(d):
+                    os.makedirs(d)
+                copytree(s, d)
+            else:
+                shutil.copy2(s, d)
+
+    copytree(temp_dir, home)
+    shutil.rmtree(temp_dir)
+    print(f"System von ZIP '{files[index]}' geladen. Willkommen {original_username}!")
+    time.sleep(2)
+
+    return original_username
 
 def main_menu():
     while True:
         clear()
         print("1. new account")
-        print("2. from link")
+        print("2. from zip backup")
         choice = input("\nchoose from: ")
         if choice == "1":
             user = create_account()
             return user
         elif choice == "2":
-            load_from_link()
-            user, _ = load_user()
-            return user
+            user = load_from_zip()
+            if user:
+                return user
+            else:
+                print("Laden fehlgeschlagen. Versuche es erneut.")
+                time.sleep(2)
         else:
             print("Ungültige Eingabe!")
             time.sleep(1)
@@ -147,7 +210,6 @@ def interactive_shell(username, commands):
             elif inp in commands:
                 run_command(inp, commands)
             else:
-                # Normale Shell-Befehle ausführen
                 try:
                     subprocess.run(inp, shell=True)
                 except Exception as e:
@@ -170,7 +232,7 @@ if __name__ == "__main__":
     main()
 EOF
 
-# help.py (zeigt alle Befehle)
+# help.py
 cat > ~/commands/help.py << 'EOF'
 commands_list_file = os.path.expanduser("~/commands/commands_list.txt")
 with open(commands_list_file, "r") as f:
@@ -182,7 +244,7 @@ with open(commands_list_file, "r") as f:
         print(f"{name} - {desc}")
 EOF
 
-# cnc.py (neuen Befehl hinzufügen)
+# cnc.py
 cat > ~/commands/cnc.py << 'EOF'
 import os
 commands_list_file = os.path.expanduser("~/commands/commands_list.txt")
@@ -213,7 +275,7 @@ with open(commands_list_file, "a") as f:
 print(f"[+] Command '{name}' hinzugefügt!")
 EOF
 
-# cun.py (Benutzername ändern)
+# cun.py
 cat > ~/commands/cun.py << 'EOF'
 import os
 USER_FILE = os.path.expanduser("~/user/user.py")
@@ -233,7 +295,7 @@ with open(USER_FILE, "w") as f:
 print("[*] Benutzername geändert. Bitte neu starten!")
 EOF
 
-# cup.py (Passwort ändern)
+# cup.py
 cat > ~/commands/cup.py << 'EOF'
 import os
 USER_FILE = os.path.expanduser("~/user/user.py")
@@ -251,28 +313,30 @@ with open(USER_FILE, "w") as f:
 print("[*] Passwort geändert!")
 EOF
 
-# ssal.py (System als ZIP speichern)
+# ssal.py ohne Passwortabfrage
 cat > ~/commands/ssal.py << 'EOF'
 import os
 import zipfile
-import getpass
 
 USER_FILE = os.path.expanduser("~/user/user.py")
 with open(USER_FILE, "r") as f:
     exec(f.read())
 
-password_check = getpass.getpass("Passwort: ")
-if password_check != PASSWORD:
-    print("Falsches Passwort!")
-    exit()
+zip_name = f"user-{USERNAME}-joste13.zip"
+zip_path = os.path.expanduser(f"~/downloads/{zip_name}")
 
-zip_path = os.path.expanduser("~/system_backup.zip")
-with zipfile.ZipFile(zip_path, 'w') as zipf:
-    for foldername, subfolders, filenames in os.walk(os.path.expanduser("~")):
+home = os.path.expanduser("~")
+
+with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+    for foldername, subfolders, filenames in os.walk(home):
+        # Überspringe die ZIP selbst im downloads Ordner
+        if foldername.startswith(os.path.expanduser("~/downloads")):
+            continue
         for filename in filenames:
             file_path = os.path.join(foldername, filename)
-            zipf.write(file_path, os.path.relpath(file_path, os.path.expanduser("~")))
-print(f"Backup gespeichert unter: {zip_path}")
+            zipf.write(file_path, os.path.relpath(file_path, home))
+
+print(f"Backup gespeichert: {zip_path}")
 EOF
 
 echo -e "${GREEN}[*] Installation abgeschlossen.${RESET}"
